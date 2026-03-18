@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telegram Nickname Finder</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">NickForge</div>
+    <nav class="menu" aria-label="Головне меню">
+      <a href="#generator">Генератор</a>
+      <a href="#how">Як працює</a>
+      <a href="#tips">Поради</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Генератор вільних Telegram-нікнеймів</h1>
+      <p>
+        Створює <strong>словесні</strong> нікнейми без цифр (типу <em>bestspeed</em>),
+        перевіряє, чи зайняті вони в Telegram, і показує тільки зручні варіанти.
+      </p>
+    </section>
+
+    <section id="generator" class="panel">
+      <h2>Параметри генерації</h2>
+      <form id="nicknameForm" class="form-grid">
+        <label for="length">Довжина нікнейма (5-16):</label>
+        <input id="length" name="length" type="number" min="5" max="16" value="9" required />
+
+        <label for="count">Скільки варіантів згенерувати:</label>
+        <select id="count" name="count">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="15">15</option>
+        </select>
+
+        <button type="submit" id="generateBtn">Згенерувати</button>
+      </form>
+
+      <div id="status" class="status" aria-live="polite"></div>
+
+      <ul id="results" class="results"></ul>
+    </section>
+
+    <section id="how" class="panel muted">
+      <h2>Як це працює</h2>
+      <ol>
+        <li>Система комбінує словникові англійські слова (без цифр і випадкових букв).</li>
+        <li>Підганяє довжину під ваш запит (від 5 до 16 символів).</li>
+        <li>Робить запит до Telegram і перевіряє доступність ніка.</li>
+      </ol>
+    </section>
+
+    <section id="tips" class="panel muted">
+      <h2>Поради</h2>
+      <ul>
+        <li>Краще працюють довжини 8-12 символів.</li>
+        <li>Короткі ніки частіше зайняті.</li>
+        <li>Натискайте «Згенерувати» кілька разів для більшого вибору.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('nicknameForm');
+    const results = document.getElementById('results');
+    const statusEl = document.getElementById('status');
+    const button = document.getElementById('generateBtn');
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>\"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }[ch]));
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const length = Number(document.getElementById('length').value);
+      const count = Number(document.getElementById('count').value);
+
+      if (length < 5 || length > 16) {
+        statusEl.textContent = 'Довжина має бути від 5 до 16.';
+        return;
+      }
+
+      button.disabled = true;
+      statusEl.textContent = 'Генерую та перевіряю ніки...';
+      results.innerHTML = '';
+
+      try {
+        const response = await fetch(`/api/generate?length=${length}&count=${count}`);
+        if (!response.ok) {
+          throw new Error('Помилка сервера');
+        }
+        const payload = await response.json();
+
+        if (!payload.items || payload.items.length === 0) {
+          statusEl.textContent = 'Нічого не знайдено. Спробуйте іншу довжину.';
+          return;
+        }
+
+        const listHtml = payload.items.map((item) => {
+          const cls = item.available ? 'free' : 'busy';
+          const label = item.available ? 'Вільний' : 'Зайнятий';
+          return `
+            <li class="result-item ${cls}">
+              <span class="name">@${escapeHtml(item.nickname)}</span>
+              <span class="badge">${label}</span>
+            </li>
+          `;
+        }).join('');
+
+        results.innerHTML = listHtml;
+        statusEl.textContent = `Готово: ${payload.items.length} варіант(ів).`;
+      } catch (error) {
+        statusEl.textContent = 'Не вдалося отримати результат. Перевірте сервер.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
